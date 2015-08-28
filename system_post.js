@@ -1,4 +1,4 @@
-var createSystem = function(buffer, srcURL) {
+var createSystem = function(buffer, workerParam) {
   var system = {};
 
   // Intrinstics.
@@ -73,7 +73,7 @@ var createSystem = function(buffer, srcURL) {
   // Threading
   if (threading_supported) {
     system.threadCreate = function(f, context) {
-      var worker = new Worker(srcURL);
+      var worker = new Worker(workerParam);
       worker.postMessage({buffer: buffer, f: f, context: context}, [buffer]);
     };
   }
@@ -120,12 +120,14 @@ var augmentInstance = function(instance, buffer) {
 var instance;
 
 var is_browser = typeof window === 'object';
-var is_worker = typeof importScripts === 'function';
+var is_d8 = typeof print === 'function';  // TODO(binji): better test?
+var is_worker = ((is_d8 && typeof postMessage !== 'undefined') ||
+                 typeof importScripts === 'function');
 
 if (!is_worker) {
-  return function(foreign, srcURL) {
+  return function(foreign, workerParam) {
     var buffer = createMemory();
-    var system = createSystem(buffer, srcURL);
+    var system = createSystem(buffer, workerParam);
     var wrapped_foreign = wrap_foreign(system, foreign);
     instance = module(stdlib, wrapped_foreign, buffer);
     augmentInstance(instance, buffer);
@@ -134,22 +136,31 @@ if (!is_worker) {
   }
 } else {
   var init = function(evt) {
-    self.removeEventListener("message", init, false);
+    if (!is_d8) {
+      self.removeEventListener("message", init, false);
+    }
 
     var buffer = evt.data.buffer;
 
     // HACK
     var foreign = {};
-    var srcURL = null;
+    var workerParam = null;
 
-    var system = createSystem(buffer, srcURL);
+    var system = createSystem(buffer, workerParam);
     var wrapped_foreign = wrap_foreign(system, foreign);
     instance = module(stdlib, wrapped_foreign, buffer);
     augmentInstance(instance, buffer);
     if (instance.threadStart) {
       instance.threadStart(evt.data.f, evt.data.context);
     }
-    self.close();
+    if (!is_d8) {
+      self.close();
+    }
   };
-  self.addEventListener("message", init, false);
+  if (is_d8) {
+    // d8 workers don't wrap messages in events, so fake it here.
+    onmessage = function(data) { init({data: data}); };
+  } else {
+    self.addEventListener("message", init, false);
+  }
 }

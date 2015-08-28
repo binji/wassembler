@@ -15,33 +15,47 @@ function compile(filename) {
 
   module = desugar.process(module);
 
-  var compiled = base.astToCompiledJS(module, sources.systemPreJS, sources.systemPostJS, {}, status);
+  var config = {
+    use_shared_memory: typeof SharedArrayBuffer !== 'undefined',
+  };
+
+  var src = base.astToJSSrc(module, sources.systemPreJS, sources.systemPostJS, config);
+  var compiled = base.evalJSSrc(src, status);
   if (status.num_errors > 0) {
     return null;
   }
-  // Generate binary encoding
-  var buffer = wasm_backend_v8.generate(module);
-  print("bytes:", new Uint8Array(buffer));
-  print("num bytes:", buffer.byteLength);
-  print();
+  print(src);
 
-  // Instantiate
-  var foreign = {
-    sinF32: function(value) {
-      return Math.fround(Math.sin(value));
-    },
-    printI32: function(value) {
-      print("print", value);
-    },
-    flipBuffer: function(ptr) {
-      print("flip", ptr);
-    },
-  };
-  var instanceJS = compiled(foreign);
-  var instanceV8 = WASM.instantiateModule(buffer, foreign);
+  var workerParam = null;
+  if (config.use_shared_memory) {
+    workerParam = src;
+  }
 
+  var instanceJS = compiled(foreign, workerParam);
   print("JS result:", instanceJS.main());
-  print("V8 result:", instanceV8.main());
+
+  if (false) {
+    // Generate binary encoding
+    var buffer = wasm_backend_v8.generate(module);
+    print("bytes:", new Uint8Array(buffer));
+    print("num bytes:", buffer.byteLength);
+    print();
+
+    // Instantiate
+    var foreign = {
+      sinF32: function(value) {
+        return Math.fround(Math.sin(value));
+      },
+      printI32: function(value) {
+        print("print", value);
+      },
+      flipBuffer: function(ptr) {
+        print("flip", ptr);
+      },
+    };
+    var instanceV8 = WASM.instantiateModule(buffer, foreign);
+    print("V8 result:", instanceV8.main());
+  }
 }
 
 if (arguments.length != 1) {

@@ -27,3 +27,11 @@ if (threading_supported) {
     SharedFloat64Array = makeSharedTypedArrayCtor(Float64Array);
   }
 }
+
+if (typeof console === 'undefined') {
+  console = {
+    log: function() {
+      print.apply(null, arguments);
+    },
+  };
+}

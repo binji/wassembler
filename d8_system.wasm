@@ -28,3 +28,13 @@ import func atomicLoadI32(i32) i32;
 import func atomicStoreI32(i32, i32) void;
 import func atomicCompareExchangeI32(i32, i32, i32) i32;
 
+// d8 Threading support.
+import func threadingSupported() i32;
+import func threadCreate(i32, i32) void;
+export func threadStart(f i32, context i32) void {
+  (i32)void(f)(context);
+}
+
+// d8 console polyfill
+import func consoleI32(i32) void;
+import func consoleString(i32, i32) void;
