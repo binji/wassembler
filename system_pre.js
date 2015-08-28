@@ -1,5 +1,5 @@
 if (threading_supported) {
-  if (!SharedInt32Array) {
+  if (typeof SharedInt32Array === 'undefined') {
     var makeSharedTypedArrayCtor = function(ctor) {
       return function(arg) {
         if (typeof arg === 'number') {
